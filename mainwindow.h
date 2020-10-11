@@ -19,8 +19,10 @@ public:
     ~MainWindow();
 
 private slots:
+    void doPaint(QPagedPaintDevice* );
     void doPaint(QPrinter* );
     void on_pb1_clicked();
+    void on_pb3_clicked();
     void on_pb4_clicked();
 
 private:

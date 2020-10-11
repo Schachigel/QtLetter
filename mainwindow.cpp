@@ -1,4 +1,5 @@
 #include <QDebug>
+#include <QPdfWriter>
 #include <QPrinterInfo>
 #include <QPainter>
 #include <QTextStream>
@@ -43,13 +44,13 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     connect(ui->ppW, SIGNAL(paintRequested(QPrinter*)), SLOT(doPaint(QPrinter*)));
-    ui->txtAdresse->setPlainText("<html><head></head><body style='font-family:Verdana; font-size:10pt'>"
-                      "<table width=100% border=1 cellspacing=0 border-collapse:collapse;><tr><td>"
-                      "<small>Absender Adresse  Abs-Platz 9, 62143 Absstadt<p></small>"
-                      "An<p>Hans Empfänger<br>Sesamstraße 42<p><big>31234</big> <b>EmpfStadt<b>"
-                      "</td></tr></table>"
-                      "</body></html>");
-    ui->txtBody->setPlainText("<hmtl><head></head><body style='font-family:Verdana; font-size:10pt;'>"
+    ui->txtAdresse->setPlainText(""
+                 "<div style='font-family:Verdana; font-size:10pt'>"
+                 "<table width=100% border=1 cellspacing=0 border-collapse:collapse;><tr><td>"
+                 "<small>Absender Adresse  Abs-Platz 9, 62143 Absstadt<p></small>"
+                 "An<p>Hans Empfänger<br>Sesamstraße 42<p><big>31234</big> <b>EmpfStadt<b>"
+                 "</td></tr></table></div>");
+    ui->txtBody->setPlainText("<div style='font-family:Verdana; font-size:10pt;'>"
                               "<table width=100% border=1 cellspacing=0 border-collapse:collapse;><tr><td>"
                               "Lieber Adalbert,<p style='text-align:justify;'>"
                               "herzlichen Dank bla bla blabla blabal bla bla blabla blabalbla bla blabla blabalbla bla blabla blabal"
@@ -58,7 +59,7 @@ MainWindow::MainWindow(QWidget *parent)
                               "<br><p>Mit freundlichen Grüßen</p>"
                               "<p> Holger Mairon</p>"
                               "<br><small>Job comment of signer</small></p>"
-                              "</td></tr></table></body></html>");
+                              "</td></tr></table></div>");
     ui->txtFusszeile->setPlainText("<hmtl><head></head><body style='font-family:Verdana; font-size:6pt'>"
                                    "<table width=100% border=1 cellspacing=0 border-collapse:collapse;>"
                                    "<tr><td width=33% style='text-align:left'><small>Geschäftsführer: Hugo Hurtig, Julia Rüstig, Eduard Montabaur</small></td>"
@@ -76,8 +77,12 @@ MainWindow::~MainWindow()
 
 void MainWindow::doPaint(QPrinter* p)
 {
+    doPaint((QPagedPaintDevice*)p);
+}
+
+void MainWindow::doPaint(QPagedPaintDevice* p)
+{
     QPainter painter;
-    printPrinterInfo(*p);
     painter.begin(p);
     QPageLayout lay = p->pageLayout();
     double leftMg =lay.marginsPoints().left();
@@ -135,6 +140,13 @@ void MainWindow::on_pb1_clicked()
     qInfo() << ui->txtFusszeile->toPlainText();
 }
 
+void MainWindow::on_pb3_clicked()
+{
+    QPdfWriter pdfw("pdfw_out.pdf");
+    doPaint(&pdfw);
+
+}
+
 void MainWindow::on_pb4_clicked()
 {
     QPrinter writer((QPrinterInfo)p); // does not work as expected
@@ -142,5 +154,5 @@ void MainWindow::on_pb4_clicked()
     printPrinterInfo(writer);
     //writer.setPageMargins(0, 0, 0, 0, QPrinter::Point);
     writer.setOutputFileName("out.pdf");
-    doPaint(&writer);
+    doPaint((QPrinter*)&writer);
 }
