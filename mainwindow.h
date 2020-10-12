@@ -19,7 +19,7 @@ public:
     ~MainWindow();
 
 private slots:
-    void doPaint(QPagedPaintDevice* );
+    void doPaint(QPagedPaintDevice*);
     void doPaint(QPrinter* );
     void on_pb1_clicked();
     void on_pb3_clicked();
@@ -27,10 +27,7 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
-    QTextDocument tdAddress;
-    QTextDocument tdBody;
-    QTextDocument tdFoot;
-    QPrinter p{QPrinter::PrinterMode::HighResolution};
+    // QPrinter p{QPrinter::PrinterMode::HighResolution};paintRequested
 
 };
 #endif // MAINWINDOW_H

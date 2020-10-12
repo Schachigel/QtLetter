@@ -32,8 +32,10 @@ void setupPrinter(QPrinter& p)
     p.setOutputFormat(QPrinter::PdfFormat);
     // Normbrief
     p.setFullPage(false);
+
     QMarginsF marg(25, 16.9, 10, 16.9);
-    p.setPageMargins(marg, QPageLayout::Millimeter);
+    QPageLayout pl( QPageSize(QPageSize::A4), QPageLayout::Portrait, marg, QPageLayout::Millimeter);
+    p.setPageLayout(pl);
     printPrinterInfo(p);
 }
 
@@ -43,7 +45,9 @@ MainWindow::MainWindow(QWidget *parent)
       , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
     connect(ui->ppW, SIGNAL(paintRequested(QPrinter*)), SLOT(doPaint(QPrinter*)));
+
     ui->txtAdresse->setPlainText(""
                  "<div style='font-family:Verdana; font-size:10pt'>"
                  "<table width=100% border=1 cellspacing=0 border-collapse:collapse;><tr><td>"
@@ -51,23 +55,22 @@ MainWindow::MainWindow(QWidget *parent)
                  "An<p>Hans Empfänger<br>Sesamstraße 42<p><big>31234</big> <b>EmpfStadt<b>"
                  "</td></tr></table></div>");
     ui->txtBody->setPlainText("<div style='font-family:Verdana; font-size:10pt;'>"
-                              "<table width=100% border=1 cellspacing=0 border-collapse:collapse;><tr><td>"
+                              "<table width=100% border=0 cellspacing=0 border-collapse:collapse;><tr><td>"
                               "Lieber Adalbert,<p style='text-align:justify;'>"
                               "herzlichen Dank bla bla blabla blabal bla bla blabla blabalbla bla blabla blabalbla bla blabla blabal"
-                              "<p style='text-align:justify;'>bla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabal"
+                              "<p style='text-align:justify; font-size:9pt'>bla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabal"
                               "<p align=justify>bla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabal"
                               "<br><p>Mit freundlichen Grüßen</p>"
-                              "<p> Holger Mairon</p>"
+                              "<p style='text-align:justify; font-size:167px'> Holger Mairon</p>"
                               "<br><small>Job comment of signer</small></p>"
                               "</td></tr></table></div>");
-    ui->txtFusszeile->setPlainText("<hmtl><head></head><body style='font-family:Verdana; font-size:6pt'>"
+    ui->txtFusszeile->setPlainText("<div style='font-family:Verdana; font-size:6pt'>"
                                    "<table width=100% border=1 cellspacing=0 border-collapse:collapse;>"
                                    "<tr><td width=33% style='text-align:left'><small>Geschäftsführer: Hugo Hurtig, Julia Rüstig, Eduard Montabaur</small></td>"
                                    "<td width=33% style='text-align:left'><small>Eine Bank Frankfurt<br>IBAN 12939 39943 22030 403<br>BIC xxx-dxx-xx</small></td>"
                                    "<td style='text-align:left'><small>Handelsregister Mannheim<br>HSB Eintrag xxxx.xxxx.xxxx</small></td>"
-                                   "</tr></table></body></html>");
+                                   "</tr></table></div>");
 
-    setupPrinter(p);
 }
 
 MainWindow::~MainWindow()
@@ -75,21 +78,27 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::doPaint(QPrinter* p)
+void MainWindow::doPaint(QPrinter* printer)
 {
-    doPaint((QPagedPaintDevice*)p);
+    qInfo() << "Printing Through Printer";
+    doPaint((QPagedPaintDevice*)printer);
 }
 
-void MainWindow::doPaint(QPagedPaintDevice* p)
+void MainWindow::doPaint(QPagedPaintDevice* pPaintDevice)
 {
+    qInfo() << "Printing Through PPD";
     QPainter painter;
-    painter.begin(p);
-    QPageLayout lay = p->pageLayout();
+
+    QPageLayout lay = pPaintDevice->pageLayout();
+    qInfo() << "paintDevice Layout: " << lay;
     double leftMg =lay.marginsPoints().left();
     double rightMg =lay.marginsPoints().right();
-//    double top =lay.marginsPoints().top();
+    double topMg =lay.marginsPoints().top();
     double bottomMg = lay.marginsPoints().bottom();
-    qInfo() << "Marings (l, r):() " << leftMg << ", " << rightMg << ")";
+    qInfo() << "orig. margins (l, r):() " << leftMg << ", " << rightMg << ")";
+    pPaintDevice->setPageMargins(QMarginsF(ptFromMm(25), ptFromMm(16), ptFromMm(20), ptFromMm(16)));
+
+    painter.begin(pPaintDevice);
     ////////////////////////////////////////
     painter.setWindow(lay.fullRectPoints());
     ////////////////////////////////////////
@@ -108,40 +117,44 @@ void MainWindow::doPaint(QPagedPaintDevice* p)
 
     painter.save();
     painter.translate(QPointF(leftMg, ptFromMm(45)));
-    tdAddress.drawContents(&painter);
+    QTextDocument td;
+    td.documentLayout()->setPaintDevice(pPaintDevice);
+    td.setPageSize(QSizeF(lay.paintRectPoints().width(), lay.paintRectPoints().height()));
+    td.setDocumentMargin(0.);
+
+    td.setHtml(ui->txtAdresse->toPlainText());
+    td.drawContents(&painter);
     painter.restore();
 
     painter.save();
     painter.translate(QPointF(leftMg, ptFromMm(105)));
     double textWidth = lay.fullRectPoints().width()-leftMg-rightMg;
     qInfo() << "TextWidth: " << textWidth;
-    tdBody.setTextWidth(textWidth);
-    tdBody.drawContents(&painter);
+    td.setTextWidth(textWidth);
+    td.setHtml(ui->txtBody->toPlainText());
+    td.drawContents(&painter);
     painter.restore();
 
-    tdFoot.setTextWidth(textWidth);
-    double footerHeight = tdFoot.size().height();
+    double footerHeight = td.size().height();
     double footerStartY = lay.fullRectPoints().height()-bottomMg-footerHeight;
     painter.translate(QPointF(leftMg, footerStartY));
-    tdFoot.drawContents(&painter);
+
+    td.setHtml(ui->txtFusszeile->toPlainText());
+    td.drawContents(&painter);
 
     painter.end();
 }
 
 void MainWindow::on_pb1_clicked()
 {
-    tdAddress.setHtml(ui->txtAdresse->toPlainText());
-    tdBody.setHtml(ui->txtBody->toPlainText());
-    tdFoot.setHtml(ui->txtFusszeile->toPlainText());
+    qInfo() << "Print to Preview";
     ui->ppW->updatePreview();
 
-    qInfo() << ui->txtAdresse->toPlainText();
-    qInfo() << ui->txtBody->toPlainText();
-    qInfo() << ui->txtFusszeile->toPlainText();
 }
 
 void MainWindow::on_pb3_clicked()
 {
+    qInfo() << "Print to QPdfWriter";
     QPdfWriter pdfw("pdfw_out.pdf");
     doPaint(&pdfw);
 
@@ -149,10 +162,11 @@ void MainWindow::on_pb3_clicked()
 
 void MainWindow::on_pb4_clicked()
 {
-    QPrinter writer((QPrinterInfo)p); // does not work as expected
-    setupPrinter(writer);
+    qInfo() << "Print to QPrinter (pdf mode)";
+
+    QPrinter writer;
+//    setupPrinter(writer);
     printPrinterInfo(writer);
-    //writer.setPageMargins(0, 0, 0, 0, QPrinter::Point);
     writer.setOutputFileName("out.pdf");
     doPaint((QPrinter*)&writer);
 }
