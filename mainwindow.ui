@@ -92,6 +92,16 @@
          <widget class="QPlainTextEdit" name="txtAdresse"/>
         </item>
         <item>
+         <widget class="QLabel" name="lblAbout">
+          <property name="text">
+           <string>Betreff</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPlainTextEdit" name="txtBetreff"/>
+        </item>
+        <item>
          <widget class="QLabel" name="label_2">
           <property name="text">
            <string>Text</string>

@@ -27,19 +27,6 @@ void printPrinterInfo(QPrinter& p)
     qInfo().noquote() << "resolution   " << p.resolution() << "\n";
 }
 
-void setupPrinter(QPrinter& p)
-{
-    p.setOutputFormat(QPrinter::PdfFormat);
-    // Normbrief
-    p.setFullPage(false);
-
-    QMarginsF marg(25, 16.9, 10, 16.9);
-    QPageLayout pl( QPageSize(QPageSize::A4), QPageLayout::Portrait, marg, QPageLayout::Millimeter);
-    p.setPageLayout(pl);
-    printPrinterInfo(p);
-}
-
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
       , ui(new Ui::MainWindow)
@@ -49,11 +36,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->ppW, SIGNAL(paintRequested(QPrinter*)), SLOT(doPaint(QPrinter*)));
 
     ui->txtAdresse->setPlainText(""
-                 "<div style='font-family:Verdana; font-size:10pt'>"
-                 "<table width=100% border=1 cellspacing=0 border-collapse:collapse;><tr><td>"
-                 "<small>Absender Adresse  Abs-Platz 9, 62143 Absstadt<p></small>"
+                 "<div style='font-family:Verdana; font-size:10pt;'>"
+                 "<table border=1 cellspacing=0 border-collapse:collapse;><tr><td>"
+                 "<div style='font-size:5pt;'>Absender Adresse  Abs-Platz 9, 62143 Absstadt<p></div>"
                  "An<p>Hans Empfänger<br>Sesamstraße 42<p><big>31234</big> <b>EmpfStadt<b>"
                  "</td></tr></table></div>");
+    ui->txtBetreff->setPlainText("<div style='font-size:10pt';> Ein wichtiger Brief</div>");
     ui->txtBody->setPlainText("<div style='font-family:Verdana; font-size:10pt;'>"
                               "<table width=100% border=0 cellspacing=0 border-collapse:collapse;><tr><td>"
                               "Lieber Adalbert,<p style='text-align:justify;'>"
@@ -86,60 +74,80 @@ void MainWindow::doPaint(QPrinter* printer)
 
 void MainWindow::doPaint(QPagedPaintDevice* pPaintDevice)
 {
+    pPaintDevice->setPageMargins(QMarginsF(0., 0., 0., 0.));
+    QPageLayout lay =pPaintDevice->pageLayout();
+    qInfo() << "paintDevice Layout: " << lay << "\n" << lay.fullRectPoints();
+    lay.setUnits(QPageLayout::Unit::Point);
+    lay.setMode(QPageLayout::FullPageMode);
+    lay.setOrientation(QPageLayout::Orientation::Portrait);
+    lay.setPageSize(QPageSize(QPageSize::A4));
+    pPaintDevice->setPageLayout(lay);
+
     qInfo() << "Printing Through PPD";
     QPainter painter;
 
-    QPageLayout lay = pPaintDevice->pageLayout();
-    qInfo() << "paintDevice Layout: " << lay;
-    double leftMg =lay.marginsPoints().left();
-    double rightMg =lay.marginsPoints().right();
-    double topMg =lay.marginsPoints().top();
-    double bottomMg = lay.marginsPoints().bottom();
-    qInfo() << "orig. margins (l, r):() " << leftMg << ", " << rightMg << ")";
-    pPaintDevice->setPageMargins(QMarginsF(ptFromMm(25), ptFromMm(16), ptFromMm(20), ptFromMm(16)));
+    double leftMarginPt  = 25. *2.83465;
+    double rightMarginPt = 20. *2.83465;
+    double bottomMarginPt= 16. *2.83465;
+
+    double foldmark1Y  =ptFromMm(105.);
+    double foldmark2Y =ptFromMm(210.);
+    double foldmarkLength =ptFromMm(5.);
+    double centermarkY =ptFromMm(148.5);
+    double centermarkLength =ptFromMm(10);
+
+    double addressFromTop   =ptFromMm(45);
+    double aboutFromAddress =ptFromMm(12);
+    double textFromAbout    =ptFromMm(12);
 
     painter.begin(pPaintDevice);
+//    double unprintableMarginPt =3.;
+
     ////////////////////////////////////////
     painter.setWindow(lay.fullRectPoints());
     ////////////////////////////////////////
 
-    // top / bottom
-    painter.drawLine(QPointF(0., 0.), QPointF(15, 0.));
-    painter.drawLine(QPointF(0., lay.fullRectPoints().height()), QPointF(15., lay.fullRectPoints().height()));
-
-    // Falzmarken, Lochmarke
-    double pos =ptFromMm(105. );
-    painter.drawLine(QPointF(0., pos), QPointF(10., pos));
-    pos =ptFromMm(210.);
-    painter.drawLine(QPointF(0., pos), QPointF(10., pos));
-    pos =ptFromMm(148.5);
-    painter.drawLine(QPointF(0., pos), QPointF(15., pos));
-
-    painter.save();
-    painter.translate(QPointF(leftMg, ptFromMm(45)));
     QTextDocument td;
     td.documentLayout()->setPaintDevice(pPaintDevice);
     td.setPageSize(QSizeF(lay.paintRectPoints().width(), lay.paintRectPoints().height()));
     td.setDocumentMargin(0.);
 
+    // top / bottom marker
+    painter.drawLine(QPointF(0., 0.), QPointF(foldmarkLength, 0.));
+    painter.drawLine(QPointF(0., lay.fullRectPoints().height()),
+                     QPointF(foldmarkLength, lay.fullRectPoints().height()));
+
+    // Falzmarken, Lochmarke
+    painter.drawLine(QPointF(0., foldmark1Y), QPointF(foldmarkLength, foldmark1Y));
+    painter.drawLine(QPointF(0., foldmark2Y), QPointF(foldmarkLength, foldmark2Y));
+    painter.drawLine(QPointF(0., centermarkY), QPointF(centermarkLength, centermarkY));
+
+    double yPos =addressFromTop;
+    painter.save();
+    painter.translate(QPointF(leftMarginPt, yPos));
     td.setHtml(ui->txtAdresse->toPlainText());
     td.drawContents(&painter);
     painter.restore();
 
+    yPos +=td.size().height() +aboutFromAddress;
     painter.save();
-    painter.translate(QPointF(leftMg, ptFromMm(105)));
-    double textWidth = lay.fullRectPoints().width()-leftMg-rightMg;
-    qInfo() << "TextWidth: " << textWidth;
+    painter.translate(QPointF(leftMarginPt, yPos));
+    td.setHtml(ui->txtBetreff->toPlainText());
+    td.drawContents(&painter);
+    painter.restore();
+
+    yPos +=td.size().height() +textFromAbout;
+    painter.save();
+    painter.translate(QPointF(leftMarginPt, yPos));
+    double textWidth = lay.fullRectPoints().width()-rightMarginPt-leftMarginPt;
     td.setTextWidth(textWidth);
     td.setHtml(ui->txtBody->toPlainText());
     td.drawContents(&painter);
     painter.restore();
 
-    double footerHeight = td.size().height();
-    double footerStartY = lay.fullRectPoints().height()-bottomMg-footerHeight;
-    painter.translate(QPointF(leftMg, footerStartY));
-
     td.setHtml(ui->txtFusszeile->toPlainText());
+    double footerStartY = lay.fullRectPoints().height()-bottomMarginPt-td.size().height();
+    painter.translate(QPointF(leftMarginPt, footerStartY));
     td.drawContents(&painter);
 
     painter.end();
