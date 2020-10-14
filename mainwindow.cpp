@@ -14,17 +14,13 @@ double mmFromPt(double pt) {
     return pt *0.35278;
 }
 
-void printPrinterInfo(QPrinter& p)
+void printPrinterInfo(QPagedPaintDevice* p)
 {
-    qInfo().noquote() << (p.printerName().isEmpty() ?  "<no name>" : p.printerName());
-    qInfo() << "Layout:      " << p.pageLayout();
-    qInfo() << "Layout->fRPt " << p.pageLayout().fullRectPoints();
-    qInfo() << "pageSizeMM:  " << p.pageSizeMM();
-    qInfo() << "pageSize:    " << (0 == p.pageSize() ? "A4" : "not A4");
-    qInfo() << "pageRect(px, mm, pt) " << p.pageRect() << p.pageRect(QPrinter::Millimeter) << p.pageRect(QPrinter::Point);
-    qInfo() << "paperRect(px)" << p.paperRect();
-    qInfo() << "fullPageMode " << (p.fullPage() ? "full page mode" : "NOT full page mode");
-    qInfo().noquote() << "resolution   " << p.resolution() << "\n";
+    qInfo() << "Layout:      " << p->pageLayout();
+    qInfo() << "Layout->fRPt " << p->pageLayout().fullRectPoints();
+    qInfo() << "pageSizeMM:  " << p->pageSizeMM();
+    qInfo() << "pageSize:    " << (0 == p->pageSize() ? "A4" : "not A4");
+    qInfo() << "physicalDpi  " << p->physicalDpiX() << ", " << p->physicalDpiY();
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -37,7 +33,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->txtAdresse->setPlainText(""
                  "<div style='font-family:Verdana; font-size:10pt;'>"
-                 "<table border=1 cellspacing=0 border-collapse:collapse;><tr><td>"
+                 "<table border=0 cellspacing=0 border-collapse:collapse;><tr>"
+                 "<td bgcolor=#EAEAEA>"
                  "<div style='font-size:5pt;'>Absender Adresse  Abs-Platz 9, 62143 Absstadt<p></div>"
                  "An<p>Hans Empfänger<br>Sesamstraße 42<p><big>31234</big> <b>EmpfStadt<b>"
                  "</td></tr></table></div>");
@@ -49,11 +46,11 @@ MainWindow::MainWindow(QWidget *parent)
                               "<p style='text-align:justify; font-size:9pt'>bla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabal"
                               "<p align=justify>bla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabalbla bla blabla blabal"
                               "<br><p>Mit freundlichen Grüßen</p>"
-                              "<p style='text-align:justify; font-size:167px'> Holger Mairon</p>"
+                              "<p style='text-align:justify; font-size:16px'> Holger Mairon</p>"
                               "<br><small>Job comment of signer</small></p>"
                               "</td></tr></table></div>");
     ui->txtFusszeile->setPlainText("<div style='font-family:Verdana; font-size:6pt'>"
-                                   "<table width=100% border=1 cellspacing=0 border-collapse:collapse;>"
+                                   "<table width=100% border=0 cellspacing=3 border-collapse:collapse;>"
                                    "<tr><td width=33% style='text-align:left'><small>Geschäftsführer: Hugo Hurtig, Julia Rüstig, Eduard Montabaur</small></td>"
                                    "<td width=33% style='text-align:left'><small>Eine Bank Frankfurt<br>IBAN 12939 39943 22030 403<br>BIC xxx-dxx-xx</small></td>"
                                    "<td style='text-align:left'><small>Handelsregister Mannheim<br>HSB Eintrag xxxx.xxxx.xxxx</small></td>"
@@ -68,7 +65,8 @@ MainWindow::~MainWindow()
 
 void MainWindow::doPaint(QPrinter* printer)
 {
-    qInfo() << "Printing Through Printer";
+    // QPrintPreviewWidget needs a QPrinter* instead of a QPagedPaintDevice*
+
     doPaint((QPagedPaintDevice*)printer);
 }
 
@@ -83,7 +81,6 @@ void MainWindow::doPaint(QPagedPaintDevice* pPaintDevice)
     lay.setPageSize(QPageSize(QPageSize::A4));
     pPaintDevice->setPageLayout(lay);
 
-    qInfo() << "Printing Through PPD";
     QPainter painter;
 
     double leftMarginPt  = 25. *2.83465;
@@ -117,7 +114,7 @@ void MainWindow::doPaint(QPagedPaintDevice* pPaintDevice)
     painter.drawLine(QPointF(0., lay.fullRectPoints().height()),
                      QPointF(foldmarkLength, lay.fullRectPoints().height()));
 
-    // Falzmarken, Lochmarke
+    // Foldmark, Center mark
     painter.drawLine(QPointF(0., foldmark1Y), QPointF(foldmarkLength, foldmark1Y));
     painter.drawLine(QPointF(0., foldmark2Y), QPointF(foldmarkLength, foldmark2Y));
     painter.drawLine(QPointF(0., centermarkY), QPointF(centermarkLength, centermarkY));
@@ -157,14 +154,17 @@ void MainWindow::on_pb1_clicked()
 {
     qInfo() << "Print to Preview";
     ui->ppW->updatePreview();
-
 }
 
 void MainWindow::on_pb3_clicked()
 {
     qInfo() << "Print to QPdfWriter";
-    QPdfWriter pdfw("pdfw_out.pdf");
-    doPaint(&pdfw);
+    QPdfWriter pdfw("fromQPdfWriter.pdf");
+    pdfw.setPdfVersion(QPagedPaintDevice::PdfVersion_1_6);
+    pdfw.setResolution(QPrinter().resolution());
+
+    printPrinterInfo(&pdfw);
+    doPaint((QPagedPaintDevice*)&pdfw);
 
 }
 
@@ -172,9 +172,10 @@ void MainWindow::on_pb4_clicked()
 {
     qInfo() << "Print to QPrinter (pdf mode)";
 
-    QPrinter writer;
-//    setupPrinter(writer);
-    printPrinterInfo(writer);
-    writer.setOutputFileName("out.pdf");
-    doPaint((QPrinter*)&writer);
+    QPrinter printer;
+    printer.setPdfVersion(QPagedPaintDevice::PdfVersion_1_6);
+    printer.setOutputFileName("fromQPrinter.pdf");
+
+    printPrinterInfo(&printer);
+    doPaint((QPagedPaintDevice*)&printer);
 }

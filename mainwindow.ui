@@ -40,14 +40,14 @@
       <item>
        <widget class="QPushButton" name="pb3">
         <property name="text">
-         <string>PB&amp;3</string>
+         <string>QPdf&amp;Writer</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QPushButton" name="pb4">
         <property name="text">
-         <string>&amp;Pdf</string>
+         <string>&amp;QPrinter</string>
         </property>
        </widget>
       </item>
